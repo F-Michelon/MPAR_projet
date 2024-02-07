@@ -2,8 +2,8 @@ from antlr4 import *
 from gramLexer import gramLexer
 from gramListener import gramListener
 from gramParser import gramParser
-import sys
 import numpy as np
+import argparse
         
 class gramPrintListener(gramListener):
 
@@ -68,22 +68,23 @@ class gramPrintListenerbis(gramListener):
             print("Possible actions: " + str([x for x in self.model[str(self.current_state)].keys()]))
             action = input("Choose an action: ")
             if action == "noact":
-                new_state = np.random.choice(self.model[str(self.current_state)]["noact"][0], size=1, p=self.model[str(self.current_state)]["noact"][1])
+                new_state = np.random.choice(self.model[str(self.current_state)]["noact"][0], size=1, p=self.model[str(self.current_state)]["noact"][1]/np.sum(self.model[str(self.current_state)]["noact"][1]))[0]
                 # print("Transition to " + str(self.model[str(self.current_state)]["noact"][0][0]) + " with weight " + str(self.model[str(self.current_state)]["noact"][1][0]))
             elif action in self.model[str(self.current_state)] and action != "noact":
-                new_state = np.random.choice(self.model[str(self.current_state)][action][0], size=1, p=self.model[str(self.current_state)][action][1])
+                new_state = np.random.choice(self.model[str(self.current_state)][action][0], size=1, p=self.model[str(self.current_state)][action][1]/np.sum(self.model[str(self.current_state)][action][1]))[0]
                 # print("Transition to " + str(self.model[str(self.current_state)][action][0][0]) + " with weight " + str(self.model[str(self.current_state)][action][1][0]))
             else:
                 print("Invalid action")
                 new_state = self.current_state
             self.current_state = new_state
             finished = input("Do you want to finish? (y/n) ") == "y"
-    
-
 
 
 def main():
-    lexer = gramLexer(StdinStream())
+    parser = argparse.ArgumentParser(description='Choose a file to read rules from.')
+    parser.add_argument('filename',type=str)
+    args = parser.parse_args()
+    lexer = gramLexer(FileStream(args.filename))
     stream = CommonTokenStream(lexer)
     parser = gramParser(stream)
     tree = parser.program()
