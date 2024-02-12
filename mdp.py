@@ -71,9 +71,12 @@ class gramPrintListenerbis(gramListener):
         # Renvoie un message d'erreur si le modèle n'est pas bon
         correct_model = True
         for state in list(self.model.keys())[:-1]:
-            # test si chaque etat à au moins une action (noact compte)
+            # test si chaque etat a au moins une action (noact compte)
             if len(self.model[state].keys()) == 0:
                 return False
+            # test si noact est présent en plus d'autres actions
+            elif 'noact' in self.model[state].keys() and len(self.model[state].keys()) > 1:
+                    return False
             for action in self.model[state].keys():
                 # test si le nombre d'etat d'arrivée est egale au nombre de poids
                 if len(self.model[state][action][0]) != len(self.model[state][action][0]):
@@ -99,10 +102,10 @@ class gramPrintListenerbis(gramListener):
                         edges_list.append((key, output_node))
             G.add_edges_from(edges_list)
             options = {
-                'node_size': 800,
-                'width': 3,
+                'node_size': 1000//len(list(self.model.keys())[:-1]),
+                'width': 3//len(list(self.model.keys())[:-1]),
                 'arrowstyle': '-|>',
-                'arrowsize': 20,
+                'arrowsize': 20//len(list(self.model.keys())[:-1]),
             }
             # drawing graph
             color = ['red' for node in G.nodes]
@@ -117,9 +120,14 @@ class gramPrintListenerbis(gramListener):
             plt.title(title)
 
             # adjust radio buttons
-            rax = plt.axes([0.05, 0.4, 0.15, 0.30])
-
-            radio = RadioButtons(rax, self.model['actions'])
+            rax = plt.axes([0, 0.5, 0.15, 0.30])
+            color_action = ['white' for i in range(len(self.model['actions']))]
+            for action in range(len(self.model['actions'])):
+                if self.model['actions'][action] in self.current_actions:
+                    color_action[action] = 'black'
+            radio = RadioButtons(rax, self.model['actions'],activecolor='white')
+            radio.set_label_props({'color': color_action})
+            radio.set_radio_props({'edgecolor': color_action})
 
             def color(action):
                 if action in self.current_actions:
@@ -142,6 +150,12 @@ class gramPrintListenerbis(gramListener):
                     for x in self.current_actions:
                         title += x + ' '
                     ax.set_title(title)
+                    color_action = ['white' for i in range(len(self.model['actions']))]
+                    for action in range(len(self.model['actions'])):
+                        if self.model['actions'][action] in self.current_actions:
+                            color_action[action] = 'black'
+                    radio.set_label_props({'color': color_action})
+                    radio.set_radio_props({'edgecolor': color_action})
                     fig.canvas.draw()
                 
             radio.on_clicked(color)
