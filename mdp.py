@@ -10,6 +10,9 @@ import matplotlib.pyplot as plt
 import my_networkx as my_nx
 import time
 from fractions import Fraction
+import warnings
+
+warnings.filterwarnings("ignore")
 
 class gramPrintListener(gramListener):
 
@@ -50,29 +53,54 @@ class gramPrintListener(gramListener):
         print("Transition from " + dep + " with no action and targets " + str(ids) + " with weights " + str(weights))
 
     def test(self):
+        print("Nous allons procéder à des tests pour voir si le modèle est correct, si non voulez-vous le corriger ?")
+        answer = input("type yes ")
+        if answer == 'yes' or answer == 'y':
+            correct = True
         # Renvoie un message d'erreur si le modèle n'est pas bon
         for state in list(self.model.keys())[:-1]:
             # test si chaque etat a au moins une action (noact compte)
             if len(self.model[state].keys()) == 0:
-                return False
+                print(f"{state} n'a pas d'action, voulez-vous qu'il boucle sur lui même ?")
+                if not correct:
+                    answer = input("type yes ")
+                if correct or answer == 'yes' or answer == 'y':
+                    self.model[state]['noact'] = [[state],[1]]
+                else:
+                    return False
             # test si noact est présent en plus d'autres actions
             if 'noact' in self.model[state].keys() and len(self.model[state].keys()) > 1:
-                return False
-            # test si le modele possede un etat où il y a une seule action qui n'est pas noact dans ce qui il remplace
-            if len(self.model[state].keys()) == 1:
+                print(f"{state} possede des actions et une transition simple, voulez-vous la supprimer ?")
+                if not correct:
+                    answer = input("type yes ")
+                if correct or answer == 'yes' or answer == 'y':
+                    del self.model[state]['noact']
+                else:
+                    return False
+            if len(self.model[state].keys()) == 1 and list(self.model[state].keys())[0] != 'noact':
+                print(f"{state} a une action qui n'est pas une transition, voulez-vous corriger ?")
                 action = list(self.model[state].keys())[0]
-                if action != 'noact':
+                if not correct:
+                    answer = input("type yes ")
+                if correct or answer == 'yes' or answer == 'y':
                     self.model[state]['noact'] = self.model[state][action]
                     del self.model[state][action]
+                else:
+                    return False
             for action in self.model[state].keys():
                 # test si le nombre d'etat d'arrivée est egale au nombre de poids
                 if len(self.model[state][action][0]) != len(self.model[state][action][1]):
-                    print("test si le nombre d'etat d'arrivée est egale au nombre de poids")
-                    return False
+                    print(f"Le nombre d'etat d'arrivée de {state} est different du nombre de poids, voulez-vous corriger ?")
+                    if not correct:
+                        answer = input("type yes ")
+                    if correct or answer == 'yes' or answer == 'y':
+                        self.model[state][action][1] = [1 for i in range(self.model[state][action][0])]
+                    else:
+                        return False
                 for i in range(len(self.model[state][action][0])):
                     # test si les etats d'arrivée sont biens des etats
                     if self.model[state][action][0][i] not in list(self.model.keys())[:-1]:
-                        print("test si les etats d'arrivée sont biens des etats")
+                        print(f"Les etats d'arrivée de {state} ne sont pas des etats")
                         return False
                     # test si les poids sont des entiers positifs
                     if type(self.model[state][action][1][i]) != int or self.model[state][action][1][i] < 0:
@@ -97,22 +125,27 @@ class gramPrintListener(gramListener):
                     for i, output_node in enumerate(self.model[key][action][0]):
                         if action == 'noact':
                             edges_list.append((key, output_node))
-                            tex_label = Fraction(int(np.sum(self.model[key][action][1])),self.model[key][action][1][i])
-                            edges_labels[(key, output_node)] = f'{tex_label.denominator}/{tex_label.numerator}'
                             if output_node not in node_label.keys():
                                 node_label[output_node] = output_node
+                            tex_label = Fraction(int(np.sum(self.model[key][action][1])),self.model[key][action][1][i])
+                            if tex_label.denominator == tex_label.numerator:
+                                edges_labels[(key, output_node)] = '1'
+                            else:
+                                edges_labels[(key, output_node)] = f'{tex_label.denominator}/{tex_label.numerator}'
                         else:
                             node_label[key + action] = action
                             edges_list.append((key + action, output_node))
                             tex_label = Fraction(int(np.sum(self.model[key][action][1])),self.model[key][action][1][i])
-                            edges_labels[(key + action, output_node)] = f'{tex_label.denominator}/{tex_label.numerator}'
+                            if tex_label.denominator == tex_label.numerator:
+                                edges_labels[(key + action, output_node)] = '1'
+                            else:
+                                edges_labels[(key + action, output_node)] = f'{tex_label.denominator}/{tex_label.numerator}'
                     if action != 'noact':
                         edges_list.append((key, key + action))
                         straight_edges.append((key, key + action))
             G.add_edges_from(edges_list)
             curved_edges = list(set(G.edges()) - set(straight_edges))
             curved_edge_labels = {edge: edges_labels[edge] for edge in curved_edges}
-            
             # Compute pos
             nodePos = nx.circular_layout(G)
             # change fake node position (actions)
@@ -141,8 +174,12 @@ class gramPrintListener(gramListener):
                     font_size.append(0)
                     font_color.append('white')
 
-            color_node = ['red' for node in G.nodes]
-            color_node[list(self.model.keys()).index(self.current_state)] = 'green'
+            color_node = []
+            for node in G.nodes:
+                if node == self.current_state:
+                    color_node.append('green')
+                else:
+                    color_node.append('red')
             curved_color_edge = ['red' for node in curved_edges]
             for i in range(len(curved_color_edge)):
                 if self.current_state in curved_edges[i][0]:
@@ -157,15 +194,15 @@ class gramPrintListener(gramListener):
                 'node_color': color_node
             }
             straight_edge_options = {
-                'width': 3//len(list(self.model.keys())[:-1]),
+                'width': 1,
                 'arrowstyle': '-|>',
-                'arrowsize': 20//len(list(self.model.keys())[:-1]),
+                'arrowsize': 5,
                 'edge_color': straight_color_edge,
             }
             curved_edge_options = {
-                'width': 3//len(list(self.model.keys())[:-1]),
+                'width': 1,
                 'arrowstyle': '-|>',
-                'arrowsize': 20//len(list(self.model.keys())[:-1]),
+                'arrowsize': 5,
                 'edge_color': curved_color_edge,
                 'connectionstyle': f'arc3, rad = {0.25}'
             }
@@ -205,147 +242,16 @@ class gramPrintListener(gramListener):
                 self.button = action
                 if action == 'Hide red edges':
                     self.to_white = True
+                    self.iter -= 1
                     radio.labels[0].set_text('Show all edges')
+                    color("Nothing")
 
-                    color_node = ['red' for node in G.nodes]
-                    color_node[list(self.model.keys()).index(self.current_state)] = 'green'
-                    curved_color_edge = ['white' for node in curved_edges]
-                    for i in range(len(curved_color_edge)):
-                        if self.current_state in curved_edges[i][0]:
-                            curved_color_edge[i] = 'green'
-                    straight_color_edge = ['white' for node in straight_edges]
-                    for i in range(len(straight_color_edge)):
-                        if self.current_state in straight_edges[i][0]:
-                            straight_color_edge[i] = 'green'
-                    curved_edge_labels = {}
-                    for edge in curved_edges:
-                        for action in self.current_actions:
-                            if self.current_state in edge[0] or self.current_state + action in edge[1]:
-                                curved_edge_labels[edge] = edges_labels[edge]
-                    label_node = {}
-                    node_label = {}
-                    for node in nodePos.keys():
-                        if node in list(self.model.keys()):
-                            label_node[node] = nodePos[node]
-                            node_label[node] = node
-                        else:
-                            for action in self.current_actions:
-                                if self.current_state + action == node:
-                                    label_node[node] = nodePos[node]
-                                    node_label[node] = action
-                    
-                    node_options = {
-                        'node_size': node_size,
-                        'node_color': color_node
-                    }
-                    straight_edge_options = {
-                        'width': 3//len(list(self.model.keys())[:-1]),
-                        'arrowstyle': '-|>',
-                        'arrowsize': 20//len(list(self.model.keys())[:-1]),
-                        'edge_color': straight_color_edge,
-                    }
-                    curved_edge_options = {
-                        'width': 3//len(list(self.model.keys())[:-1]),
-                        'arrowstyle': '-|>',
-                        'arrowsize': 20//len(list(self.model.keys())[:-1]),
-                        'edge_color': curved_color_edge,
-                        'connectionstyle': f'arc3, rad = {0.25}'
-                    }
-
-                    # drawing graph
-                    ax.clear()
-                    nx.draw_networkx_nodes(G, ax=ax, pos=nodePos, **node_options)
-                    nx.draw_networkx_labels(G, ax=ax, pos=nodePos, labels=node_label)
-                    nx.draw_networkx_edges(G, pos=nodePos, ax=ax, edgelist=straight_edges, **straight_edge_options)
-                    nx.draw_networkx_edges(G, pos=nodePos, ax=ax,edgelist=curved_edges, **curved_edge_options)
-                    my_nx.my_draw_networkx_edge_labels(G, ax=ax, edge_labels=curved_edge_labels, pos=nodePos, rotate=False,rad = 0.25)
-                    ax.axis('off')
-                    self.iter += 1
-                    title = f"Vous êtes dans l'état {self.current_state}"
-                    actions = ''
-                    for x in self.current_actions:
-                        actions += x + ' '
-                    if 'noact' in self.current_actions:
-                        title += f"\nil n'y a pas d'action possible\niter ={self.iter}"
-                    else:
-                        title += f'\nLes actions possibles sont : ' + actions + f'\niter ={self.iter}'
-                    ax.set_title(title)
-                    color_action = ['black', 'black'] + ['white' for i in range(len(self.model['actions']))]
-                    color_action[2:len(self.current_actions)] = ['black' for i in range(len(self.current_actions))]
-                    for i, action in enumerate(self.current_actions):
-                        radio.labels[2 + i].set_text(action)
-                    radio.set_label_props({'color': color_action})
-                    radio.set_radio_props({'edgecolor': color_action})
-                    fig.canvas.draw()
                 elif action == 'Show all edges':
                     self.to_white = False
+                    self.iter -= 1
                     radio.labels[0].set_text('Hide red edges')
-                    
-                    curved_edge_labels = {edge: edges_labels[edge] for edge in curved_edges}
-                    color_node = ['red' for node in G.nodes]
-                    color_node[list(self.model.keys()).index(self.current_state)] = 'green'
-                    curved_color_edge = ['red' for node in curved_edges]
-                    for i in range(len(curved_color_edge)):
-                        if self.current_state in curved_edges[i][0]:
-                            curved_color_edge[i] = 'green'
-                    straight_color_edge = ['red' for node in straight_edges]
-                    for i in range(len(straight_color_edge)):
-                        if self.current_state in straight_edges[i][0]:
-                            straight_color_edge[i] = 'green'
-                    label_node = {}
-                    node_label = {}
-                    for node in nodePos.keys():
-                        label_node[node] = nodePos[node]
-                        if node not in list(self.model.keys())[:-1]:
-                            node_label[node] = node[-1]
-                        else:
-                            node_label[node] = node
+                    color("Nothing")
 
-
-                    node_options = {
-                        'node_size': node_size,
-                        'node_color': color_node
-                    }
-                    straight_edge_options = {
-                        'width': 3//len(list(self.model.keys())[:-1]),
-                        'arrowstyle': '-|>',
-                        'arrowsize': 20//len(list(self.model.keys())[:-1]),
-                        'edge_color': straight_color_edge,
-                    }
-                    curved_edge_options = {
-                        'width': 3//len(list(self.model.keys())[:-1]),
-                        'arrowstyle': '-|>',
-                        'arrowsize': 20//len(list(self.model.keys())[:-1]),
-                        'edge_color': curved_color_edge,
-                        'connectionstyle': f'arc3, rad = {0.25}'
-                    }
-
-                    # drawing graph, we need to clear it first
-                    ax.clear()
-                    nx.draw_networkx_nodes(G, ax=ax, pos=nodePos, **node_options)
-                    nx.draw_networkx_labels(G, ax=ax, pos=nodePos, labels=node_label)
-                    nx.draw_networkx_edges(G, pos=nodePos, ax=ax, edgelist=straight_edges, **straight_edge_options)
-                    nx.draw_networkx_edges(G, pos=nodePos, ax=ax,edgelist=curved_edges, **curved_edge_options)
-                    my_nx.my_draw_networkx_edge_labels(G, ax=ax, edge_labels=curved_edge_labels, pos=nodePos, rotate=False,rad = 0.25)
-
-                    ax.axis('off')
-                    self.iter += 1
-                    title = f"Vous êtes dans l'état {self.current_state}"
-                    actions = ''
-                    for x in self.current_actions:
-                        actions += x + ' '
-                    if 'noact' in self.current_actions:
-                        title += f"\nil n'y a pas d'action possible\niter ={self.iter}"
-                    else:
-                        title += f'\nLes actions possibles sont : ' + actions + f'\niter ={self.iter}'
-                    ax.set_title(title)
-                    color_action = ['black', 'black'] + ['white' for i in range(len(self.model['actions']))]
-                    color_action[2:len(self.current_actions)] = ['black' for i in range(len(self.current_actions))]
-                    for i, action in enumerate(self.current_actions):
-                        radio.labels[2 + i].set_text(action)
-                    radio.set_label_props({'color': color_action})
-                    radio.set_radio_props({'edgecolor': color_action})
-                    fig.canvas.draw()
                 elif action == 'Random walk':
                     radio.labels[1].set_text('Stop random walk')
                     while self.button != 'Stop random walk':
@@ -356,13 +262,13 @@ class gramPrintListener(gramListener):
                 elif action == 'Stop random walk':
                     radio.labels[1].set_text('Random walk')
                     fig.canvas.draw()
-                elif action in self.current_actions or action == 'passe':
+
+                elif action in self.current_actions or action == 'passe' or action == 'Nothing':
                     if action == "passe" or action == 'noact':
                         new_state = np.random.choice(self.model[str(self.current_state)]["noact"][0], size=1, p=self.model[str(self.current_state)]["noact"][1]/np.sum(self.model[str(self.current_state)]["noact"][1]))[0]
                     elif action in self.model[str(self.current_state)] and action != "noact":
                         new_state = np.random.choice(self.model[str(self.current_state)][action][0], size=1, p=self.model[str(self.current_state)][action][1]/np.sum(self.model[str(self.current_state)][action][1]))[0]
                     else:
-                        print("Invalid action")
                         new_state = self.current_state
                     self.current_state = new_state
                     self.current_actions = list(self.model[self.current_state].keys())
@@ -397,8 +303,12 @@ class gramPrintListener(gramListener):
                             else:
                                 node_label[node] = node
                         curved_edge_labels = {edge: edges_labels[edge] for edge in curved_edges}
-                    color_node = ['red' for node in G.nodes]
-                    color_node[list(self.model.keys()).index(self.current_state)] = 'green'
+                    color_node = []
+                    for node in G.nodes:
+                        if node == self.current_state:
+                            color_node.append('green')
+                        else:
+                            color_node.append('red')
                     curved_color_edge = [edge_color for node in curved_edges]
                     for i in range(len(curved_color_edge)):
                         if self.current_state in curved_edges[i][0]:
@@ -413,15 +323,15 @@ class gramPrintListener(gramListener):
                         'node_color': color_node
                     }
                     straight_edge_options = {
-                        'width': 3//len(list(self.model.keys())[:-1]),
+                        'width': 1,
                         'arrowstyle': '-|>',
-                        'arrowsize': 20//len(list(self.model.keys())[:-1]),
+                        'arrowsize': 5,
                         'edge_color': straight_color_edge,
                     }
                     curved_edge_options = {
-                        'width': 3//len(list(self.model.keys())[:-1]),
+                        'width': 1,
                         'arrowstyle': '-|>',
-                        'arrowsize': 20//len(list(self.model.keys())[:-1]),
+                        'arrowsize': 5,
                         'edge_color': curved_color_edge,
                         'connectionstyle': f'arc3, rad = {0.25}'
                     }
