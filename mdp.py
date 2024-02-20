@@ -154,7 +154,7 @@ class gramPrintListener(gramListener):
                 for key2 in nodePos:
                     if key in list(self.model.keys())[:-1] and key2 in list(self.model.keys())[:-1]:
                         posdist = np.linalg.norm(np.array([nodePos[key], nodePos[key2]]))
-            r = np.min(posdist) / len(self.model.keys())
+            r = np.min(posdist) / 3 # len(self.model.keys())
             for node in G.nodes():
                 if node in list(self.model.keys())[:-1] and len(self.model[node].keys()) > 1:
                     for i, action in enumerate(self.model[node].keys()):
@@ -162,18 +162,11 @@ class gramPrintListener(gramListener):
 
             # define params
             node_size = []
-            font_size = []
-            font_color = []
             for node in G.nodes():
                 if node in list(self.model.keys())[:-1]:
                     node_size.append(1000//len(list(self.model.keys())[:-1]))
-                    font_size.append(1)
-                    font_color.append('black')
                 else:
                     node_size.append(0)
-                    font_size.append(0)
-                    font_color.append('white')
-
             color_node = []
             for node in G.nodes:
                 if node == self.current_state:
@@ -276,6 +269,14 @@ class gramPrintListener(gramListener):
                     # drawing graph
                     if self.to_white:
                         edge_color = 'white'
+
+                        straight_edges = []
+                        for edge in G.edges():
+                            if self.current_state == edge[0] and edge[1] not in self.model.keys():
+                                straight_edges.append(edge)
+                            elif self.current_state in edge[0]:
+                                curved_edges.append(edge)
+                        
                         label_node = {}
                         node_label = {}
                         for node in nodePos.keys():
@@ -294,6 +295,15 @@ class gramPrintListener(gramListener):
                                     curved_edge_labels[edge] = edges_labels[edge]
                     else:
                         edge_color = 'red'
+
+                        straight_edges = []
+                        for edge in G.edges():
+                            for act in self.model['actions']:
+                                if act in edge[1]:
+                                    straight_edges.append(edge)
+                            if edge not in straight_edges:
+                                curved_edges.append(edge)
+
                         label_node = {}
                         node_label = {}
                         for node in nodePos.keys():
@@ -303,10 +313,13 @@ class gramPrintListener(gramListener):
                             else:
                                 node_label[node] = node
                         curved_edge_labels = {edge: edges_labels[edge] for edge in curved_edges}
+
                     color_node = []
-                    for node in G.nodes:
+                    for node in node_label.keys():
                         if node == self.current_state:
                             color_node.append('green')
+                        elif node not in self.model.keys():
+                            color_node.append('white')
                         else:
                             color_node.append('red')
                     curved_color_edge = [edge_color for node in curved_edges]
@@ -319,7 +332,7 @@ class gramPrintListener(gramListener):
                             straight_color_edge[i] = 'green'
 
                     node_options = {
-                        'node_size': node_size,
+                        'node_size': 1000//len(list(self.model.keys())[:-1]),
                         'node_color': color_node
                     }
                     straight_edge_options = {
@@ -338,7 +351,7 @@ class gramPrintListener(gramListener):
 
                     # drawing graph
                     ax.clear()
-                    nx.draw_networkx_nodes(G, ax=ax, pos=nodePos, **node_options)
+                    nx.draw_networkx_nodes(G, ax=ax, pos=nodePos, nodelist=list(node_label.keys()), **node_options)
                     nx.draw_networkx_labels(G, ax=ax, pos=nodePos, labels=node_label)
                     nx.draw_networkx_edges(G, pos=nodePos, ax=ax, edgelist=straight_edges, **straight_edge_options)
                     nx.draw_networkx_edges(G, pos=nodePos, ax=ax,edgelist=curved_edges, **curved_edge_options)
