@@ -23,6 +23,9 @@ class gramPrintListener(gramListener):
         self.iter = 0
         self.to_white = False
         self.button = None
+        self.epsilon = 0.05
+        self.delta = 0.01
+        self.N = (np.log(2) - np.log(self.delta))/(2*(self.epsilon**2))
         
     def enterDefstates(self, ctx):
         for x in ctx.ID():
@@ -53,7 +56,7 @@ class gramPrintListener(gramListener):
         print("Transition from " + dep + " with no action and targets " + str(ids) + " with weights " + str(weights))
 
     def test(self):
-        print("Nous allons procéder à des tests pour voir si le modèle est correct, si non voulez-vous le corriger ?")
+        print("Nous allons procéder à des tests pour voir si le modèle est correct, dans le cas contraire voulez-vous le corriger ?")
         answer = input("type yes ")
         if answer == 'yes' or answer == 'y':
             correct = True
@@ -107,6 +110,18 @@ class gramPrintListener(gramListener):
                         print("test si les poids sont des entiers positifs")
                         return False
         return True
+    
+    def simulate(self):
+        self.current_state = 'S0'
+        self.current_actions = list(self.model[self.current_state].keys())
+        final_states = ['s1', 's2', 's3', 's4', 's5', 's6']
+        not_end = self.current_state in final_states
+        while not_end:
+            action = np.random.choice(self.current_actions, size=1)[0]
+            self.current_state = np.random.choice(self.model[str(self.current_state)][action][0], size=1, p=self.model[str(self.current_state)][action][1]/np.sum(self.model[str(self.current_state)][action][1]))[0]
+            self.current_actions = list(self.model[self.current_state].keys())
+            not_end = self.current_state in final_states
+        return self.current_state
 
     def play(self):
         if self.test():
@@ -216,7 +231,7 @@ class gramPrintListener(gramListener):
             if 'noact' in self.current_actions:
                 title += f"\nil n'y a pas d'action possible\niter ={self.iter}"
             else:
-                title += f'\nLes actions possibles sont : ' + actions + '\niter ={self.iter}'
+                title += f'\nLes actions possibles sont : ' + actions + f'\niter ={self.iter}'
             plt.title(title)
 
             # adjust radio buttons
@@ -224,9 +239,9 @@ class gramPrintListener(gramListener):
             color_action = ['black', 'black'] + ['white' for i in range(len(self.model['actions']))]
             color_action[2:len(self.current_actions)] = ['black' for i in range(len(self.current_actions))]
             if 'noact' in self.current_actions:
-                radio_labels = ['Hide red edges', 'Random walk'] + ['passe'] + ['nothing' for i in range(len(self.model['actions']) - len(self.current_actions))]
+                radio_labels = ['Hide red edges', 'Random walk'] + ['passe'] + ['' for i in range(len(self.model['actions']) - len(self.current_actions))]
             else:
-                radio_labels = ['Hide red edges', 'Random walk'] + ['passe'] + ['nothing' for i in range(len(self.model['actions']) - len(self.current_actions))]
+                radio_labels = ['Hide red edges', 'Random walk'] + [action for action in self.current_actions]
             radio = RadioButtons(rax, radio_labels, activecolor='white')
             radio.set_label_props({'color': color_action})
             radio.set_radio_props({'edgecolor': color_action})
@@ -250,7 +265,7 @@ class gramPrintListener(gramListener):
                     while self.button != 'Stop random walk':
                         random_action = np.random.choice(self.current_actions, size=1)[0]
                         color(random_action)
-                        plt.pause(1)
+                        plt.pause(0.1)
 
                 elif action == 'Stop random walk':
                     radio.labels[1].set_text('Random walk')
