@@ -1,4 +1,6 @@
 from antlr4 import *
+import sys
+sys.path.append('gram')
 from gramLexer import gramLexer
 from gramListener import gramListener
 from gramParser import gramParser
