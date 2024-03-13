@@ -1,10 +1,12 @@
 grammar gram;
 
 program
-    : defstates defactions transitions EOF
+    : defstates defstatesreward defactions transitions EOF
     ;
 
 defstates : STATES ID (',' ID)* ';';
+defstatesreward : STATES ID ':' INT (',' ID ':' INT)* ';';
+
 defactions : ACTIONS ID (',' ID)* ';';
 
 transitions : trans (trans)* ;
