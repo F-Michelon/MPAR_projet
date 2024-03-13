@@ -25,7 +25,7 @@ class gramPrintListener(gramListener):
         self.model = {}
         self.inverted_graph = {}
         self.actions = []
-        self.states = {}
+        self.reward = {}
         self.theta = {}
         self.iter = 0
         self.to_white = False
@@ -42,8 +42,7 @@ class gramPrintListener(gramListener):
         states = [str(x) for x in ctx.ID()]
         reward = [0 for x in ctx.ID()]
         for x in states:
-            self.states[x] = {}
-            self.states[x]['reward'] = 0
+            self.reward[x] = 0
         print(f"States: {str([str(x) for x in ctx.ID()])}  Reward: {reward}")
 
     def enterDefstatesreward(self, ctx):
@@ -53,8 +52,7 @@ class gramPrintListener(gramListener):
             self.model[x] = {}
             self.theta[str(x)] = {}
         for i, x in enumerate(reward):
-            self.states[states[i]] = {}
-            self.states[states[i]]['reward'] = x
+            self.reward[states[i]] = x
         print(f"States: {states} Reward: {reward}")
 
     def enterDefactions(self, ctx):
@@ -493,6 +491,7 @@ def main():
             printer.play_terminal()
         printer.resume()
         mc.value_iteration(printer)
+        print(printer.theta)
     else:
         print("Le modèle n'est pas correct")
 

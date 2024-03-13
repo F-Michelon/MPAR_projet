@@ -156,13 +156,13 @@ def norm2(L1, L2):
     return d ** 0.5
 
 def value_iteration(printer, gamma=1, epsilon=1):
-    V0 = [printer.states[s]['reward'] for s in printer.model.keys()]
+    V0 = [printer.reward[s] for s in printer.model.keys()]
     V = [0 for s in printer.model.keys()]
     while norm1(V0, V) > epsilon:
         for i, s in enumerate(list(printer.model.keys())):
             s_action = []
             for action in printer.model[s].keys():
-                s_action.append(printer.states[s]['reward'] + np.sum([printer.model[s][action][1][printer.model[s][action][0].index(list(printer.model.keys())[i])] * V0[i] / np.sum(printer.model[s][action][1]) for i in range(len(V0)) if list(printer.model.keys())[i] in printer.model[s][action][0]]))
+                s_action.append(printer.reward[s] + np.sum([printer.model[s][action][1][printer.model[s][action][0].index(list(printer.model.keys())[i])] * V0[i] / np.sum(printer.model[s][action][1]) for i in range(len(V0)) if list(printer.model.keys())[i] in printer.model[s][action][0]]))
             V[i] = np.max(s_action)
         V2 = V0.copy()
         V0 = V.copy()
@@ -170,7 +170,7 @@ def value_iteration(printer, gamma=1, epsilon=1):
     for s in printer.model.keys():
         s_action = []
         for action in printer.model[s].keys():
-            s_action.append(printer.states[s]['reward'] + np.sum([printer.model[s][action][1][printer.model[s][action][0].index(list(printer.model.keys())[i])] * V0[i] / np.sum(printer.model[s][action][1]) for i in range(len(V0)) if list(printer.model.keys())[i] in printer.model[s][action][0]]))
+            s_action.append(printer.reward[s] + np.sum([printer.model[s][action][1][printer.model[s][action][0].index(list(printer.model.keys())[i])] * V0[i] / np.sum(printer.model[s][action][1]) for i in range(len(V0)) if list(printer.model.keys())[i] in printer.model[s][action][0]]))
         printer.theta[s] = list(printer.model[s].keys())[np.argmax(s_action)]
 
 def create_inverted_graph(self):
