@@ -173,6 +173,54 @@ def value_iteration(printer, gamma=1, epsilon=1):
             s_action.append(printer.states[s]['reward'] + np.sum([printer.model[s][action][1][printer.model[s][action][0].index(list(printer.model.keys())[i])] * V0[i] / np.sum(printer.model[s][action][1]) for i in range(len(V0)) if list(printer.model.keys())[i] in printer.model[s][action][0]]))
         printer.theta[s] = list(printer.model[s].keys())[np.argmax(s_action)]
 
+def create_inverted_graph(self):
+    for state in self.model.keys():
+        self.inverted_graph[state] = {}
+        for action in self.actions:
+            self.inverted_graph[state][action] = [[],[]]
+    for state in self.model.keys():
+        for action in self.model[state].keys():
+            for i, arrival_state in enumerate(self.model[state][action][0]):
+                if state not in self.inverted_graph[arrival_state][action][0]:
+                    self.inverted_graph[arrival_state][action][0].append(state)
+                    self.inverted_graph[arrival_state][action][1].append(self.model[state][action][1][i]/np.sum(self.model[state][action][1]))
+    for state in self.inverted_graph.keys():
+        for action in self.actions:
+            if self.inverted_graph[state][action] == [[],[]]:
+                del self.inverted_graph[state][action]
+
+def recursive_dfs(self, node, visited=None):
+    if visited is None:
+        visited = []
+    if node not in visited:
+        visited.append(node)
+    for action in self.inverted_graph[node].keys():
+        unvisited = [n for n in self.inverted_graph[node][action][0] if n not in visited]
+        for new_node in unvisited:
+            self.recursive_dfs(new_node, visited)
+    return visited
+
+def get_S1(self, goal):
+    S1 = [goal]
+    # on crée le graph inversé
+    self.inverted_graph()
+    S = self.recursive_dfs(goal)
+    return S1, S
+    
+def model_checking(self):
+    goal = []
+    choosen = False
+    while not choosen:
+        goal.append(input(f"Choissisez un ou des etats de départ parmis les états disponibles comme objectif {list(self.model.keys())} "))
+        choosen = input("Voulez-vous ajouter un etat supplémentaire ? (y/n) ") == "y"
+    S = []
+    S1 = []
+    for state in goal:
+        L = self.get_S1(goal)
+        S1 += L[0]
+        S += L[1]
+    S0 = list(set(list(self.model.keys())) - set(S))
+
 if __name__ == "__main__":
     # Example
     mc = {'a':{'a':0.3, 'b':0.7}, 'b':{'a':0.5, 'b':0.5}}
