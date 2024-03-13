@@ -144,6 +144,9 @@ class gramPrintListener(gramListener):
         return self.current_state, iter
     
     def montecarlo(self, delta=0.01, epsilon=0.01):
+        print('\n\n------------------------------------\nMONTE CARLO\n------------------------------------')
+        if input("Voulez vous faire du SPRT ? y/n ") != "y":
+            return 0
         start = input(f"Choississez un etat de départ parmi : {list(self.model.keys())} ")
         end = input(f"Choississez un etat de d'arriver parmi : {list(self.model.keys())} ")
         iter_max = int(input(f"Choississez le nombre d'itération dans une simulation : "))
@@ -156,6 +159,9 @@ class gramPrintListener(gramListener):
         print(f"La probabilité y d'obtenir {end} en partant de {start} est destimée par yN = {succes / N} avec P(|yN - y| > {epsilon}) < {delta} en {N} itération")
     
     def SPRT(self, epsilon=0.01, alpha=0.01, beta=0.01):
+        print('\n\n------------------------------------\nSPRT\n------------------------------------')
+        if input("Voulez vous faire du Monte Carlo ? y/n ") != "y":
+            return 0
         start = input(f"Choississez un etat de départ parmi : {list(self.model.keys())} ")
         end = input(f"Choississez un etat de d'arriver parmi : {list(self.model.keys())} ")
         theta = float(input(f"Choississez la borne à tester : "))
@@ -583,7 +589,7 @@ def main():
         printer.create_inverted_graph()
         print(printer.inverted_graph)
         print(printer.recursive_dfs(node='S1'))
-        # printer.montecarlo()
+        printer.montecarlo()
         printer.SPRT()
     else:
         print("Le modèle n'est pas correct")
