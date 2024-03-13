@@ -129,17 +129,56 @@ class gramPrintListener(gramListener):
                         return False
         return True
     
-    def simulate(self):
-        self.current_state = 'S0'
+    def simulate_markov(self, start, end, iter_max=100):
+        # only for markov chain
+        self.current_state = start
         self.current_actions = list(self.model[self.current_state].keys())
-        final_states = ['s1', 's2', 's3', 's4', 's5', 's6']
-        not_end = self.current_state in final_states
-        while not_end:
-            action = np.random.choice(self.current_actions, size=1)[0]
-            self.current_state = np.random.choice(self.model[str(self.current_state)][action][0], size=1, p=self.model[str(self.current_state)][action][1]/np.sum(self.model[str(self.current_state)][action][1]))[0]
+        end_simu = self.current_state in end
+        iter = 0
+        while not end_simu and iter < iter_max:
+            iter += 1
+            action = self.current_actions[0]
+            self.current_state = np.random.choice(self.model[self.current_state][action][0], size=1, p=self.model[self.current_state][action][1]/np.sum(self.model[self.current_state][action][1]))[0]
             self.current_actions = list(self.model[self.current_state].keys())
-            not_end = self.current_state in final_states
-        return self.current_state
+            end_simu = self.current_state in end
+        return self.current_state, iter
+    
+    def montecarlo(self, delta=0.01, epsilon=0.01):
+        start = input(f"Choississez un etat de départ parmi : {list(self.model.keys())} ")
+        end = input(f"Choississez un etat de d'arriver parmi : {list(self.model.keys())} ")
+        iter_max = int(input(f"Choississez le nombre d'itération dans une simulation : "))
+        N = int((np.log(2) - np.log(delta)) / ((2 * epsilon ** 2))) + 1
+        succes = 0
+        for i in range(N):
+            result, iter = self.simulate_markov(start, end, iter_max)
+            if result in end:
+                succes += 1
+        print(f"La probabilité y d'obtenir {end} en partant de {start} est destimée par yN = {succes / N} avec P(|yN - y| > {epsilon}) < {delta} en {N} itération")
+    
+    def SPRT(self, epsilon=0.01, alpha=0.01, beta=0.01):
+        start = input(f"Choississez un etat de départ parmi : {list(self.model.keys())} ")
+        end = input(f"Choississez un etat de d'arriver parmi : {list(self.model.keys())} ")
+        theta = float(input(f"Choississez la borne à tester : "))
+        iter_max = int(input(f"Choississez le nombre d'itération dans une simulation : "))
+        A = (1 - beta) / alpha
+        B = beta / (1 - alpha)
+        gamma1 = theta - epsilon
+        gamma0 = theta + epsilon
+        Rm = 1
+        done = Rm >= A or Rm <= B
+        iter_SPRT = 0
+        while not done:
+            iter_SPRT += 1
+            result, iter = self.simulate_markov(start, end, iter_max)
+            if result in end:
+                Rm = Rm * (gamma1/gamma0)
+            else:
+                Rm = Rm * (1 - gamma1) / (1 - gamma0)
+            done = Rm >= A or Rm <= B
+        if Rm >= A:
+            print(f"La probabilité y d'obtenir {end} en partant de {start} est < {gamma1} en {iter_SPRT} itération")
+        elif Rm <= B:
+            print(f"La probabilité y d'obtenir {end} en partant de {start} est > {gamma0} en {iter_SPRT} itération")
 
     def play(self):
         self.actions.sort()
@@ -501,8 +540,8 @@ class gramPrintListener(gramListener):
         goal = []
         choosen = False
         while not choosen:
-            goal.append(input(f"Choissisez un ou des etats de départ parmis les états disponibles comme objectif {list(self.model.keys())}"))
-            choosen = input("Voulez-vous ajouter un etat supplémentaire ? (y/n)") == "y"
+            goal.append(input(f"Choissisez un ou des etats de départ parmis les états disponibles comme objectif {list(self.model.keys())} "))
+            choosen = input("Voulez-vous ajouter un etat supplémentaire ? (y/n) ") == "y"
         S = []
         S1 = []
         for state in goal:
@@ -534,7 +573,7 @@ def main():
     if printer.test():
         printer.current_state = list(printer.model.keys())[0]
         printer.current_actions = list(printer.model[printer.current_state].keys())
-        answer = input("Entrer 1 pour intéragir visuellement avec le modèle, 2 pour intéragir avec le terminal")
+        answer = input("Entrer 1 pour intéragir visuellement avec le modèle, 2 pour intéragir avec le terminal ")
         if answer == '1':
             printer.play()
         if answer == '2':
@@ -544,6 +583,8 @@ def main():
         printer.create_inverted_graph()
         print(printer.inverted_graph)
         print(printer.recursive_dfs(node='S1'))
+        # printer.montecarlo()
+        printer.SPRT()
     else:
         print("Le modèle n'est pas correct")
 
