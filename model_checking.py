@@ -155,10 +155,10 @@ def norm2(L1, L2):
         d += (L1[i] - L2[i]) ** 2
     return d ** 0.5
 
-def value_iteration(printer, gamma=1, epsilon=1):
+def value_iteration(printer, gamma=1, epsilon=0.01, norm=norm2):
     V0 = [printer.reward[s] for s in printer.model.keys()]
     V = [0 for s in printer.model.keys()]
-    while norm1(V0, V) > epsilon:
+    while norm(V0, V) > epsilon:
         for i, s in enumerate(list(printer.model.keys())):
             s_action = []
             for action in printer.model[s].keys():
