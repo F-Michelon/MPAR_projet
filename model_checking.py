@@ -86,7 +86,7 @@ def prob_states_mc(states:list, mc:dict):
     
     return prob_states
 
-def simulate_markov(printer, start, end, iter_max=100):
+def simulate_markov(printer, scheduler=None, start=None, end=None, iter_max=100):
     # only for markov chain
     printer.current_state = start
     printer.current_actions = list(printer.model[printer.current_state].keys())
@@ -94,7 +94,15 @@ def simulate_markov(printer, start, end, iter_max=100):
     iter = 0
     while not end_simu and iter < iter_max:
         iter += 1
-        action = printer.current_actions[0]
+        if scheduler is None:
+            action = printer.current_actions[0]
+        else:
+            action = None
+            max = 0
+            for a in scheduler[printer.current_state].keys():
+                if scheduler[printer.current_state][a] > max:
+                    max = scheduler[printer.current_state][a]
+                    action = a
         printer.current_state = np.random.choice(printer.model[printer.current_state][action][0], size=1, p=printer.model[printer.current_state][action][1]/np.sum(printer.model[printer.current_state][action][1]))[0]
         printer.current_actions = list(printer.model[printer.current_state].keys())
         end_simu = printer.current_state in end
@@ -110,19 +118,24 @@ def montecarlo(printer, delta=0.01, epsilon=0.01):
     N = int((np.log(2) - np.log(delta)) / ((2 * epsilon ** 2))) + 1
     succes = 0
     for i in range(N):
-        result, iter = printer.simulate_markov(start, end, iter_max)
+        result, iter = simulate_markov(printer, start=start, end=end, iter_max=iter_max)
         if result in end:
             succes += 1
     print(f"La probabilité y d'obtenir {end} en partant de {start} est destimée par yN = {succes / N} avec P(|yN - y| > {epsilon}) < {delta} en {N} itération")
 
-def SPRT(printer, epsilon=0.01, alpha=0.01, beta=0.01):
-    print('\n\n------------------------------------\nSPRT\n------------------------------------')
-    if input("Voulez vous faire du SPRT ? y/n ") != "y":
-        return 0
-    start = input(f"Choississez un etat de départ parmi : {list(printer.model.keys())} ")
-    end = input(f"Choississez un etat de d'arriver parmi : {list(printer.model.keys())} ")
-    theta = float(input(f"Choississez la borne à tester : "))
-    iter_max = int(input(f"Choississez le nombre d'itération dans une simulation : "))
+def SPRT(printer, scheduler=None, epsilon=0.01, alpha=0.01, beta=0.01, iter_max=None, theta=None, start=None, end=None, verbose=True):
+    if verbose:
+        print('\n\n------------------------------------\nSPRT\n------------------------------------')
+        if input("Voulez vous faire du SPRT ? y/n ") != "y":
+            return 0
+    if start is None:
+        start = input(f"Choississez un etat de départ parmi : {list(printer.model.keys())} ")
+    if end is None:
+        end = input(f"Choississez un etat de d'arriver parmi : {list(printer.model.keys())} ")
+    if theta is None:
+        theta = float(input(f"Choississez la borne à tester : "))
+    if iter_max is None:
+        iter_max = int(input(f"Choississez le nombre d'itération dans une simulation : "))
     A = (1 - beta) / alpha
     B = beta / (1 - alpha)
     gamma1 = theta - epsilon
@@ -132,16 +145,22 @@ def SPRT(printer, epsilon=0.01, alpha=0.01, beta=0.01):
     iter_SPRT = 0
     while not done:
         iter_SPRT += 1
-        result, iter = printer.simulate_markov(start, end, iter_max)
+        result, iter = simulate_markov(printer, scheduler=scheduler, start=start, end=end, iter_max=iter_max)
         if result in end:
             Rm = Rm * (gamma1/gamma0)
         else:
             Rm = Rm * (1 - gamma1) / (1 - gamma0)
         done = Rm >= A or Rm <= B
     if Rm >= A:
-        print(f"La probabilité y d'obtenir {end} en partant de {start} est < {gamma1} en {iter_SPRT} itération")
+        if verbose:
+            print(f"La probabilité y d'obtenir {end} en partant de {start} est < {gamma1} en {iter_SPRT} itération")
+        else:
+            return 'H1'
     elif Rm <= B:
-        print(f"La probabilité y d'obtenir {end} en partant de {start} est > {gamma0} en {iter_SPRT} itération")
+        if verbose:
+            print(f"La probabilité y d'obtenir {end} en partant de {start} est > {gamma0} en {iter_SPRT} itération")
+        else:
+            return 'H0'
 
 def norm1(L1, L2):
     d = []
@@ -180,6 +199,99 @@ def value_iteration(printer, gamma=0.5, epsilon=0.01, norm=norm2):
         printer.theta[s] = list(printer.model[s].keys())[np.argmax(s_action)]
     return iter
 
+def get_path(printer, scheduler, start, end, size=20):
+    a = None
+    max = 0
+    for action in printer.actions:
+        if scheduler[start][action] > max:
+            a = action
+            max = scheduler[start][action]
+    path = [[start, a]]
+    while len(path) < size and path[-1][0] != end:
+        s, a = path[-1]
+        s = np.random.choice(printer.model[s][a][0], size=1, p=printer.model[s][a][1]/np.sum(printer.model[s][a][1]))[0]
+        max = 0
+        a = None
+        for action in printer.actions:
+            if scheduler[s][action] > max:
+                a = action
+                max = scheduler[s][action]
+        path.append([s, a])
+    return path
+
+def satisfied(path, end):
+    return path[-1][0] == end
+
+def init_scheduler(printer):
+    scheduler = {}
+    for s in printer.model.keys():
+        scheduler[s] = {}
+        for action in printer.actions:
+            scheduler[s][action] = (1 / len(printer.actions)) * (action in list(printer.model[s].keys()))
+    return scheduler
+
+def scheduler_evaluation(printer, scheduler, N, start, end):
+    # initialisation
+    R_plus, R_moins, Q = {}, {}, {}
+    for s in printer.model.keys():
+        R_plus[s], R_moins[s], Q[s] = {}, {}, {}
+        for a in printer.actions:
+            R_plus[s][a], R_moins[s][a], Q[s][a] = 0, 0, scheduler[s][a]
+    paths = []
+    for i in range(N):
+        path = get_path(printer, scheduler, start, end)
+        for j in range(len(path)):
+            s, a = path[j]
+            if path[j] not in paths:
+                paths.append(path[j])
+            if satisfied(path, end):
+                R_plus[s][a] += 1
+            else:
+                R_moins[s][a] += 1
+    for p in paths:
+        s, a = p
+        Q[s][a] = R_plus[s][a] / (R_plus[s][a] + R_moins[s][a])
+    return Q
+
+
+def scheduler_improvement(printer, h, epsilon, Q, scheduler):
+    for s in Q.keys():
+        Q_values = [Q[s][key] for key in Q[s].keys()]
+        a = list(Q[s].keys())[np.argmax(Q_values)]
+        for action in printer.actions:
+            p_sa = (action == a) * (1 - epsilon) + epsilon * (Q[s][a]) / (np.sum(Q_values))
+            scheduler[s][a] = h * scheduler[s][a] + (1 - h) * p_sa
+
+def scheduler_optimisation(printer, h, epsilon, N, L, start, end, scheduler=None):
+    if scheduler is None:
+        scheduler = init_scheduler(printer)
+    for i in range(L):
+        Q = scheduler_evaluation(printer, scheduler, N, start, end)
+        scheduler_improvement(printer, h, epsilon, Q, scheduler)
+    return scheduler
+
+def determinise(printer, scheduler):
+    for s in printer.model.keys():
+        max = 0
+        a = None
+        for action in printer.actions:
+            if scheduler[s][action] > max:
+                max = scheduler[s][action]
+                a = action
+        for action in printer.actions:
+            scheduler[s][action] = 1 * (action == a)
+
+def statistical_model_checking(printer, h, epsilon, N, L, p, etha, start, end, theta, ineq):
+    T = int(np.log(etha) / np.log(1 - p)) + 1
+    for i in range(T):
+        print(f"{i}/{T}")
+        scheduler = scheduler_optimisation(printer, h, epsilon, N, L, start, end)
+        determinise(printer, scheduler)
+        if SPRT(printer, epsilon=0.001, alpha=0.01, beta=0.01, iter_max=15, theta=theta, start=start, end=end, verbose=False) != ineq:
+            return False
+    return True
+
+
 def is_equal(d1, d2):
     # return true if two dicts are equal
     for key in d1.keys():
@@ -187,53 +299,53 @@ def is_equal(d1, d2):
             return False
     return True
 
-def create_inverted_graph(self):
-    for state in self.model.keys():
-        self.inverted_graph[state] = {}
-        for action in self.actions:
-            self.inverted_graph[state][action] = [[],[]]
-    for state in self.model.keys():
-        for action in self.model[state].keys():
-            for i, arrival_state in enumerate(self.model[state][action][0]):
-                if state not in self.inverted_graph[arrival_state][action][0]:
-                    self.inverted_graph[arrival_state][action][0].append(state)
-                    self.inverted_graph[arrival_state][action][1].append(self.model[state][action][1][i]/np.sum(self.model[state][action][1]))
-    for state in self.inverted_graph.keys():
-        for action in self.actions:
-            if self.inverted_graph[state][action] == [[],[]]:
-                del self.inverted_graph[state][action]
+def create_inverted_graph(printer):
+    for state in printer.model.keys():
+        printer.inverted_graph[state] = {}
+        for action in printer.actions:
+            printer.inverted_graph[state][action] = [[],[]]
+    for state in printer.model.keys():
+        for action in printer.model[state].keys():
+            for i, arrival_state in enumerate(printer.model[state][action][0]):
+                if state not in printer.inverted_graph[arrival_state][action][0]:
+                    printer.inverted_graph[arrival_state][action][0].append(state)
+                    printer.inverted_graph[arrival_state][action][1].append(printer.model[state][action][1][i]/np.sum(printer.model[state][action][1]))
+    for state in printer.inverted_graph.keys():
+        for action in printer.actions:
+            if printer.inverted_graph[state][action] == [[],[]]:
+                del printer.inverted_graph[state][action]
 
-def recursive_dfs(self, node, visited=None):
+def recursive_dfs(printer, node, visited=None):
     if visited is None:
         visited = []
     if node not in visited:
         visited.append(node)
-    for action in self.inverted_graph[node].keys():
-        unvisited = [n for n in self.inverted_graph[node][action][0] if n not in visited]
+    for action in printer.inverted_graph[node].keys():
+        unvisited = [n for n in printer.inverted_graph[node][action][0] if n not in visited]
         for new_node in unvisited:
-            self.recursive_dfs(new_node, visited)
+            recursive_dfs(printer, new_node, visited)
     return visited
 
-def get_S1(self, goal):
+def get_S1(printer, goal):
     S1 = [goal]
     # on crée le graph inversé
-    self.inverted_graph()
-    S = self.recursive_dfs(goal)
+    create_inverted_graph(printer)
+    S = recursive_dfs(printer, goal)
     return S1, S
     
-def model_checking(self):
+def model_checking(printer):
     goal = []
     choosen = False
     while not choosen:
-        goal.append(input(f"Choissisez un ou des etats de départ parmis les états disponibles comme objectif {list(self.model.keys())} "))
+        goal.append(input(f"Choissisez un ou des etats de départ parmis les états disponibles comme objectif {list(printer.model.keys())} "))
         choosen = input("Voulez-vous ajouter un etat supplémentaire ? (y/n) ") == "y"
     S = []
     S1 = []
     for state in goal:
-        L = self.get_S1(goal)
+        L = get_S1(printer, goal)
         S1 += L[0]
         S += L[1]
-    S0 = list(set(list(self.model.keys())) - set(S))
+    S0 = list(set(list(printer.model.keys())) - set(S))
 
 if __name__ == "__main__":
     # Example

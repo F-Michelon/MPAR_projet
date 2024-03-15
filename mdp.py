@@ -490,8 +490,9 @@ def main():
         if answer == '2':
             printer.play_terminal()
         printer.resume()
-        iter = mc.value_iteration(printer,epsilon=0.001)
+        iter = mc.value_iteration(printer,epsilon=0.001, norm=mc.norm1)
         print(f"Voici la politique calculée pour ce modèle avec cette algorithme {printer.theta} en {iter} itérations")
+        print(mc.statistical_model_checking(printer, h=0.01, epsilon=0.01, N=100, L=10, p=0.01, etha=0.1, start='S0', end='s1', theta=0.16, ineq='H0'))
     else:
         print("Le modèle n'est pas correct")
 
