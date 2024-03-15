@@ -490,8 +490,8 @@ def main():
         if answer == '2':
             printer.play_terminal()
         printer.resume()
-        mc.value_iteration(printer)
-        print(printer.theta)
+        iter = mc.value_iteration(printer,epsilon=0.001)
+        print(f"Voici la politique calculée pour ce modèle avec cette algorithme {printer.theta} en {iter} itérations")
     else:
         print("Le modèle n'est pas correct")
 

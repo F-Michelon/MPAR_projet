@@ -155,23 +155,37 @@ def norm2(L1, L2):
         d += (L1[i] - L2[i]) ** 2
     return d ** 0.5
 
-def value_iteration(printer, gamma=1, epsilon=0.01, norm=norm2):
+def value_iteration(printer, gamma=0.5, epsilon=0.01, norm=norm2):
     V0 = [printer.reward[s] for s in printer.model.keys()]
     V = [0 for s in printer.model.keys()]
+    iter = 0
     while norm(V0, V) > epsilon:
+        iter += 1
         for i, s in enumerate(list(printer.model.keys())):
             s_action = []
             for action in printer.model[s].keys():
-                s_action.append(printer.reward[s] + np.sum([printer.model[s][action][1][printer.model[s][action][0].index(list(printer.model.keys())[i])] * V0[i] / np.sum(printer.model[s][action][1]) for i in range(len(V0)) if list(printer.model.keys())[i] in printer.model[s][action][0]]))
-            V[i] = np.max(s_action)
+                s_action.append(0)
+                for j, arrive_state in enumerate(printer.model[s][action][0]):
+                    s_action[-1] += (printer.model[s][action][1][j] / np.sum(printer.model[s][action][1])) * V0[list(printer.model.keys()).index(arrive_state)] * gamma
+            V[i] = printer.reward[s] + np.max(s_action)
         V2 = V0.copy()
         V0 = V.copy()
         V = V2.copy()
     for s in printer.model.keys():
         s_action = []
         for action in printer.model[s].keys():
-            s_action.append(printer.reward[s] + np.sum([printer.model[s][action][1][printer.model[s][action][0].index(list(printer.model.keys())[i])] * V0[i] / np.sum(printer.model[s][action][1]) for i in range(len(V0)) if list(printer.model.keys())[i] in printer.model[s][action][0]]))
+            s_action.append(0)
+            for j, arrive_state in enumerate(printer.model[s][action][0]):
+                s_action[-1] += (printer.model[s][action][1][j] / np.sum(printer.model[s][action][1])) * V0[list(printer.model.keys()).index(arrive_state)] * gamma
         printer.theta[s] = list(printer.model[s].keys())[np.argmax(s_action)]
+    return iter
+
+def is_equal(d1, d2):
+    # return true if two dicts are equal
+    for key in d1.keys():
+        if d1[key] != d2[key]:
+            return False
+    return True
 
 def create_inverted_graph(self):
     for state in self.model.keys():
