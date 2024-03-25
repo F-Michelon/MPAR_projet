@@ -1,6 +1,6 @@
 '''
-{state1 : {state2: prob, state3: prob, ...}, ...} (mc)
-{state1 : {action1: {state2: prob, state3: prob, ...}, action2: {state2: prob, state3: prob, ...}, ...}, ...} (mdp)
+{state1 : {'noact' : [['state1', 'state2', ...], [prob1, prob2, ...]], ...}}
+{state1 : {action1: [['state1', 'state2', ...], [prob1, prob2, ...]], action2: ...}}
 '''
 
 import numpy as np
@@ -14,12 +14,13 @@ def is_reachable_mc(mc:dict, s:str, t:str):
 
     if s == t:
         return True
-    elif t in mc[s]:
+    elif t in mc[s]['noact'][0]:
         return True
     else:
-        for s_ in mc[s]:
-            if is_reachable_mc(mc, s_, t):
-                return True
+        for s_ in mc[s]['noact'][0]:
+            if s_ != s:
+                if is_reachable_mc(mc, s_, t):
+                    return True
     return False
 
 def is_reachable_mdp(mdp:dict, s:str, t:str):
@@ -29,7 +30,7 @@ def is_reachable_mdp(mdp:dict, s:str, t:str):
     return True if t is reachable from s, and False otherwise.
     '''
 
-    neighbours = [v.keys() for v in mdp[s].values()]
+    neighbours = list(np.flatten([mdp[s][act][0] for act in mdp[s].keys()]))
     if s == t:
         return True
     elif t in neighbours:
@@ -47,6 +48,10 @@ def prob_states_mc(states:list, mc:dict):
     return the probability of reaching the set of states for each state in the markov chain.
     '''
 
+    # Normalize probabilities in the markov chain
+    for s in mc.keys():
+        mc[s]['noact'][1] = list(mc[s]['noact'][1]/(np.sum(mc[s]['noact'][1])))
+
     # Create a list of states that can reach the given set of states
     S_tilde = []
     for s in mc.keys():
@@ -60,14 +65,18 @@ def prob_states_mc(states:list, mc:dict):
     A = np.zeros((len(S_tilde), len(S_tilde)))
     for s in S_tilde:
         for t in S_tilde:
-            A[S_tilde.index(s), S_tilde.index(t)] = mc[s][t]
+            if t in mc[s]['noact'][0]:
+                A[S_tilde.index(s), S_tilde.index(t)] = mc[s]['noact'][1][mc[s]['noact'][0].index(t)]
+            else:
+                A[S_tilde.index(s), S_tilde.index(t)] = 0
 
     # Create the vector b containing the probabilities of reaching the set of states within one step for each state in S_tilde
     b = np.zeros(len(S_tilde))
     for s in S_tilde:
         p=0
         for u in states:
-            p+=mc[s][u]
+            if u in mc[s]['noact'][0]:
+                p+=mc[s]['noact'][1][mc[s]['noact'][0].index(u)]
         b[S_tilde.index(s)] = p
 
     # Solve the linear system of equations to find the probability of reaching the set of states for each state in S_tilde
@@ -76,7 +85,7 @@ def prob_states_mc(states:list, mc:dict):
 
     # Create a dictionary to store the probabilities of reaching the set of states for each state in the markov chain
     prob_states = {}
-    for s in mc.keys():
+    for s in mc.keys(): 
         if s in states:
             prob_states[s] = 1
         elif s in S_tilde:
@@ -349,7 +358,7 @@ def model_checking(printer):
 
 if __name__ == "__main__":
     # Example
-    mc = {'a':{'a':0.3, 'b':0.7}, 'b':{'a':0.5, 'b':0.5}}
-    states = ['a']
+    mc = {'S0': {'noact': [['S1', 'S2'], [5, 5]]}, 'S1': {'noact': [['S1', 'S2'], [3, 7]]}, 'S2': {'noact': [['S0'], [1]]}, 'S3': {'noact': [['S3'], [1]]}}
+    states = ['S0']
 
     print(prob_states_mc(states, mc))
